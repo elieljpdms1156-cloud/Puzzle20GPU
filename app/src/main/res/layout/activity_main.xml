@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#000">
+    
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:max="524288"/>
+    
+    <TextView
+        android:id="@+id/tvSpeed"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ready"
+        android:textSize="20sp"
+        android:textColor="#0f0"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="8dp"/>
+    
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Puzzle #20"
+        android:textSize="14sp"
+        android:textColor="#fff"
+        android:gravity="center"
+        android:padding="8dp"
+        android:background="#111"/>
+    
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="▶ START"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:backgroundTint="#0f0"
+        android:textColor="#000"
+        android:layout_marginTop="12dp"/>
+    
+    <TextView
+        android:id="@+id/tvResult"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:text=""
+        android:textSize="16sp"
+        android:textColor="#0f0"
+        android:gravity="center"
+        android:background="#111"
+        android:padding="12dp"
+        android:layout_marginTop="8dp"
+        android:fontFamily="monospace"/>
+    
+</LinearLayout>
