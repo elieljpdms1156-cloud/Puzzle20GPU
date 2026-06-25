@@ -11,16 +11,18 @@ jobs:
         run: |
           vcpkg install secp256k1 opencl
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
+      - name: Listar arquivos de lib (debug)
+        run: |
+          dir "$env:VCPKG_ROOT\installed\x64-windows\lib\*secp256k1*"
+          dir "$env:VCPKG_ROOT\installed\x64-windows\lib\*OpenCL*"
       - name: Compilar
         run: |
           cl /O2 /nologo /Fe:puzzle_gpu.exe puzzle_gpu_multi.c ripemd160.c `
-            /I"$env:VCPKG_ROOT/installed/x64-windows/include" `
+            /I"$env:VCPKG_ROOT\installed\x64-windows\include" `
             /link `
-            "$env:VCPKG_ROOT/installed/x64-windows/lib/secp256k1.lib" `
-            "$env:VCPKG_ROOT/installed/x64-windows/lib/OpenCL.lib" `
+            "$env:VCPKG_ROOT\installed\x64-windows\lib\libsecp256k1.lib" `
+            "$env:VCPKG_ROOT\installed\x64-windows\lib\OpenCL.lib" `
             user32.lib
-      - name: Copiar kernel.cl para artefato
-        run: copy kernel.cl kernel.cl
       - uses: actions/upload-artifact@v4
         with:
           name: puzzle_gpu
