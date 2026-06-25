@@ -19,7 +19,11 @@ jobs:
             "$env:VCPKG_ROOT/installed/x64-windows/lib/secp256k1.lib" `
             "$env:VCPKG_ROOT/installed/x64-windows/lib/OpenCL.lib" `
             user32.lib
+      - name: Copiar kernel.cl para artefato
+        run: copy kernel.cl kernel.cl
       - uses: actions/upload-artifact@v4
         with:
           name: puzzle_gpu
-          path: puzzle_gpu.exe
+          path: |
+            puzzle_gpu.exe
+            kernel.cl
