@@ -1,4 +1,4 @@
-name: Build Windows EXE com GPU
+name: Build Windows EXE com GPU (Multi-Alvo)
 on: [push, workflow_dispatch]
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
       - name: Compilar
         run: |
-          cl /O2 /nologo /Fe:puzzle_gpu.exe puzzle_gpu.c ripemd160.c `
+          cl /O2 /nologo /Fe:puzzle_gpu.exe puzzle_gpu_multi.c ripemd160.c `
             /I"$env:VCPKG_ROOT/installed/x64-windows/include" `
             /link `
             "$env:VCPKG_ROOT/installed/x64-windows/lib/secp256k1.lib" `
