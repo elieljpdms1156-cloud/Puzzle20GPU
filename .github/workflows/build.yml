@@ -11,13 +11,9 @@ jobs:
         run: |
           vcpkg install secp256k1 opencl
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
-      - name: Listar arquivos de lib (debug)
+      - name: Compilar (com /MT para link estático)
         run: |
-          dir "$env:VCPKG_ROOT\installed\x64-windows\lib\*secp256k1*"
-          dir "$env:VCPKG_ROOT\installed\x64-windows\lib\*OpenCL*"
-      - name: Compilar
-        run: |
-          cl /O2 /nologo /Fe:puzzle_gpu.exe puzzle_gpu_multi.c ripemd160.c `
+          cl /O2 /nologo /MT /Fe:puzzle_gpu.exe puzzle_gpu_multi.c ripemd160.c `
             /I"$env:VCPKG_ROOT\installed\x64-windows\include" `
             /link `
             "$env:VCPKG_ROOT\installed\x64-windows\lib\libsecp256k1.lib" `

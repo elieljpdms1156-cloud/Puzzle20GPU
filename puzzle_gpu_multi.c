@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <time.h>
 #include <CL/cl.h>
+
+#define SECP256K1_STATIC   // <--- ESSENCIAL para link estático
 #include <secp256k1.h>
 #include "ripemd160.h"
 
