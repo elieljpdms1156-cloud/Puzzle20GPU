@@ -1,4 +1,4 @@
-name: Build Windows EXE com GPU (Multi-Alvo)
+name: Build Windows EXE com GPU
 on: [push, workflow_dispatch]
 jobs:
   build:

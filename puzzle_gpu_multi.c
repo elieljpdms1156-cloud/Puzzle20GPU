@@ -1,7 +1,6 @@
 /*
- * puzzle_gpu_multi.c – Solver GPU (OpenCL) com suporte a MÚLTIPLOS alvos.
+ * puzzle_gpu_multi.c – Solver GPU (OpenCL) com múltiplos alvos.
  * Menu interativo para colecionar carteiras.
- * Compilação: cl /O2 /Fe:puzzle_gpu.exe puzzle_gpu_multi.c ripemd160.c ...
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,11 +16,10 @@
 
 typedef uint64_t u64;
 
-/* ========== Alvos cadastrados ========== */
 static uint8_t targets[MAX_TARGETS][20];
 static int num_targets = 0;
+static uint32_t target_first4[MAX_TARGETS];
 
-/* ========== Kernel OpenCL ========== */
 static const char* kernelSrc = R"KERNEL(
 typedef uint uint32_t;
 typedef ulong uint64_t;
@@ -36,15 +34,12 @@ __constant uint K[64] = {
     0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
     0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 };
-
 inline uint rightRotate(uint x, uint n) { return (x >> n) | (x << (32-n)); }
-
 __kernel void sha256_batch(__global const uchar* pubkeys, __global uint* hashes) {
     int gid = get_global_id(0);
     __global const uchar* pub = pubkeys + gid * 33;
     uint w[64];
-    for(int i=0; i<8; i++)
-        w[i] = ((uint)pub[4*i]<<24) | (pub[4*i+1]<<16) | (pub[4*i+2]<<8) | pub[4*i+3];
+    for(int i=0; i<8; i++) w[i] = ((uint)pub[4*i]<<24) | (pub[4*i+1]<<16) | (pub[4*i+2]<<8) | pub[4*i+3];
     w[8] = ((uint)pub[32]<<24) | 0x800000;
     for(int i=9; i<15; i++) w[i] = 0;
     w[15] = 264;
@@ -78,7 +73,6 @@ __kernel void sha256_batch(__global const uchar* pubkeys, __global uint* hashes)
 }
 )KERNEL";
 
-/* ========== Auxiliares ========== */
 static secp256k1_context *g_ctx;
 static void make_privkey(uint8_t priv[32], u64 hi, u64 lo) {
     memset(priv,0,32);
@@ -100,10 +94,6 @@ static inline int cmp128(u64 ah,u64 al,u64 bh,u64 bl){
     if(ah!=bh)return ah<bh?-1:1;if(al!=bl)return al<bl?-1:1;return 0;
 }
 
-/* ========== Pré‑calcular primeiros 4 bytes de cada alvo ========== */
-static uint32_t target_first4[MAX_TARGETS];
-
-/* ========== Menu e busca ========== */
 static void menu() {
     printf("\n========= COLECIONADOR DE CARTEIRAS =========\n");
     printf("1. Adicionar hash160 (hex, 40 caracteres)\n");
@@ -113,7 +103,6 @@ static void menu() {
     printf("5. Sair\n");
     printf("Opcao: ");
 }
-
 static int add_target(const char* hex) {
     if (strlen(hex) != 40) return 0;
     if (num_targets >= MAX_TARGETS) return 0;
@@ -127,14 +116,12 @@ static int add_target(const char* hex) {
     num_targets++;
     return 1;
 }
-
 static void load_from_file() {
     FILE *f = fopen("alvos.txt", "r");
     if (!f) { printf("Arquivo alvos.txt nao encontrado.\n"); return; }
     char line[128];
     int added = 0;
     while (fgets(line, sizeof(line), f)) {
-        // remove espaços e newline
         char *p = strchr(line, '\n'); if(p) *p=0;
         p = strchr(line, '\r'); if(p) *p=0;
         if (strlen(line) == 40) {
@@ -144,7 +131,6 @@ static void load_from_file() {
     fclose(f);
     printf("%d hash160s carregados.\n", added);
 }
-
 static void list_targets() {
     printf("\n==== %d ALVOS CADASTRADOS ====\n", num_targets);
     for (int i=0; i<num_targets; i++) {
@@ -159,14 +145,11 @@ int main(int argc, char* argv[]) {
     if(!g_ctx){ fprintf(stderr,"secp256k1 init fail\n"); return 1; }
 
     printf("=== Colecionador de Carteiras (GPU) ===\n");
-    printf("Digite os hash160s das carteiras desejadas e inicie a busca.\n");
-
     while (1) {
         menu();
         int opcao;
         scanf("%d", &opcao);
-        getchar(); // limpa newline
-
+        getchar();
         if (opcao == 1) {
             char hex[128];
             printf("Cole o hash160 (40 hex): ");
@@ -179,11 +162,15 @@ int main(int argc, char* argv[]) {
         } else if (opcao == 3) {
             list_targets();
         } else if (opcao == 4) {
-            if (num_targets == 0) {
-                printf("Nenhum alvo cadastrado.\n");
-                continue;
-            }
-            // Configura OpenCL
+            if (num_targets == 0) { printf("Nenhum alvo.\n"); continue; }
+            printf("Intervalo (inicio fim em hex): ");
+            u64 llo, hlo;
+            scanf("%llx %llx", &llo, &hlo); getchar();
+            u64 lhi=0, hhi=0;
+            int nth;
+            printf("Threads CPU: ");
+            scanf("%d", &nth); getchar();
+
             cl_platform_id plat; cl_device_id dev; cl_context ctx; cl_command_queue q;
             cl_program prog; cl_kernel k; cl_int ret;
             clGetPlatformIDs(1,&plat,NULL);
@@ -198,21 +185,6 @@ int main(int argc, char* argv[]) {
                 fprintf(stderr,"Kernel error: %s\n",log); free(log); return 1;
             }
             k = clCreateKernel(prog,"sha256_batch",&ret);
-
-            // Intervalos padrão? Pedir ao usuário ou definir para puzzles 20-25?
-            printf("Digite o intervalo (inicio fim em hex, ex: 80000 FFFFF): ");
-            u64 llo, hlo;
-            char buf[64];
-            fgets(buf, sizeof(buf), stdin);
-            sscanf(buf, "%llx %llx", &llo, &hlo);
-            u64 lhi=0, hhi=0;
-            int nth = 2; // threads de CPU para point addition? Podemos perguntar.
-            printf("Threads CPU (ex: 2): ");
-            scanf("%d", &nth); getchar();
-
-            printf("================================\n");
-            printf("[+] Buscando %d alvos no intervalo %llx - %llx\n", num_targets, llo, hlo);
-            printf("================================\n");
 
             cl_mem pub_buf = clCreateBuffer(ctx,CL_MEM_READ_ONLY,BATCH*33,NULL,NULL);
             cl_mem hash_buf = clCreateBuffer(ctx,CL_MEM_WRITE_ONLY,BATCH*8*sizeof(uint32_t),NULL,NULL);
@@ -270,7 +242,6 @@ int main(int argc, char* argv[]) {
                                 printf("Hash160: ");
                                 for (int j=0; j<20; j++) printf("%02x", full[j]);
                                 printf("\n");
-                                // Opcional: parar ou continuar? Vamos continuar.
                             }
                         }
                     }
