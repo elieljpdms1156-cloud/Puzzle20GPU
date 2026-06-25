@@ -1,88 +1,27 @@
 /*
  * puzzle_gpu.c – Solver Bitcoin Puzzle com GPU (OpenCL)
  * SHA256 na GPU, RIPEMD160 na CPU. Prefiltro de 4 bytes.
- * Uso: puzzle_gpu.exe [puzzle (20/25)] [threads]
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
+#include <CL/cl.h>
 #include <secp256k1.h>
 #include "ripemd160.h"
 
 typedef uint64_t u64;
 
-/* Alvos hash160 */
+/* Alvos */
 static const uint8_t T20[20] = {0xb9,0x07,0xc3,0xa2,0xa3,0xb2,0x77,0x89,0xdf,0xb5,0x09,0xb7,0x30,0xdd,0x47,0x70,0x3c,0x27,0x28,0x68};
 static const uint8_t T25[20] = {0x2f,0x39,0x6b,0x29,0xb2,0x73,0x24,0x30,0x0d,0x0c,0x59,0xb1,0x7c,0x3a,0xbc,0x18,0x35,0xbd,0x3d,0xbb};
 
-/* ========== OpenCL dinâmico (sem dependência de .lib) ========== */
-#define CL_SUCCESS 0
-typedef struct _cl_platform_id *cl_platform_id;
-typedef struct _cl_device_id *cl_device_id;
-typedef struct _cl_context *cl_context;
-typedef struct _cl_command_queue *cl_command_queue;
-typedef struct _cl_program *cl_program;
-typedef struct _cl_kernel *cl_kernel;
-typedef struct _cl_mem *cl_mem;
-typedef int cl_int;
-typedef unsigned int cl_uint;
-typedef unsigned long cl_ulong;
-
-static cl_int (*clGetPlatformIDs)(cl_uint, cl_platform_id*, cl_uint*);
-static cl_int (*clGetDeviceIDs)(cl_platform_id, cl_uint, cl_uint, cl_device_id*, cl_uint*);
-static cl_context (*clCreateContext)(void*, cl_uint, const cl_device_id*, void*, void*, cl_int*);
-static cl_command_queue (*clCreateCommandQueue)(cl_context, cl_device_id, cl_uint, cl_int*);
-static cl_program (*clCreateProgramWithSource)(cl_context, cl_uint, const char**, size_t*, cl_int*);
-static cl_int (*clBuildProgram)(cl_program, cl_uint, const cl_device_id*, const char*, void*, void*);
-static cl_kernel (*clCreateKernel)(cl_program, const char*, cl_int*);
-static cl_mem (*clCreateBuffer)(cl_context, cl_uint, size_t, void*, cl_int*);
-static cl_int (*clSetKernelArg)(cl_kernel, cl_uint, size_t, const void*);
-static cl_int (*clEnqueueNDRangeKernel)(cl_command_queue, cl_kernel, cl_uint, size_t*, size_t*, size_t*, cl_uint, void*, void*);
-static cl_int (*clEnqueueReadBuffer)(cl_command_queue, cl_mem, cl_int, size_t, size_t, void*, cl_uint, void*, void*);
-static cl_int (*clEnqueueWriteBuffer)(cl_command_queue, cl_mem, cl_int, size_t, size_t, const void*, cl_uint, void*, void*);
-static cl_int (*clReleaseMemObject)(cl_mem);
-static cl_int (*clReleaseKernel)(cl_kernel);
-static cl_int (*clReleaseProgram)(cl_program);
-static cl_int (*clReleaseCommandQueue)(cl_command_queue);
-static cl_int (*clReleaseContext)(cl_context);
-
-void* ocl_dll = NULL;
-int ocl_loaded = 0;
-
-int load_opencl() {
-    if (ocl_loaded) return 1;
-#ifdef _WIN32
-    ocl_dll = LoadLibrary("OpenCL.dll");
-#else
-    ocl_dll = dlopen("libOpenCL.so", RTLD_LAZY);
-#endif
-    if (!ocl_dll) { fprintf(stderr, "OpenCL.dll não encontrada. Instale os drivers da GPU.\n"); return 0; }
-#define LOAD(fn) fn = (void*)GetProcAddress(ocl_dll, #fn); if(!fn) return 0;
-    LOAD(clGetPlatformIDs); LOAD(clGetDeviceIDs);
-    LOAD(clCreateContext); LOAD(clCreateCommandQueue);
-    LOAD(clCreateProgramWithSource); LOAD(clBuildProgram);
-    LOAD(clCreateKernel); LOAD(clCreateBuffer);
-    LOAD(clSetKernelArg); LOAD(clEnqueueNDRangeKernel);
-    LOAD(clEnqueueReadBuffer); LOAD(clEnqueueWriteBuffer);
-    LOAD(clReleaseMemObject); LOAD(clReleaseKernel);
-    LOAD(clReleaseProgram); LOAD(clReleaseCommandQueue);
-    LOAD(clReleaseContext);
-#undef LOAD
-    ocl_loaded = 1;
-    return 1;
-}
-
-/* ========== Kernel SHA256 (OpenCL) ========== */
-static const char* kernelSrc = R"(
+/* ========== Kernel OpenCL ========== */
+static const char* kernelSrc = R"KERNEL(
 typedef uint uint32_t;
 typedef ulong uint64_t;
+
 __constant uint K[64] = {
     0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
     0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
@@ -93,7 +32,9 @@ __constant uint K[64] = {
     0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
     0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 };
+
 inline uint rightRotate(uint x, uint n) { return (x >> n) | (x << (32-n)); }
+
 __kernel void sha256_batch(__global const uchar* pubkeys, __global uint* hashes) {
     int gid = get_global_id(0);
     __global const uchar* pub = pubkeys + gid * 33;
@@ -131,7 +72,7 @@ __kernel void sha256_batch(__global const uchar* pubkeys, __global uint* hashes)
     hashes[gid*8 + 6] = g + s6;
     hashes[gid*8 + 7] = h + s7;
 }
-)";
+)KERNEL";
 
 /* ========== Auxiliares ========== */
 static secp256k1_context *g_ctx;
@@ -163,7 +104,6 @@ int main(int argc, char* argv[]) {
 
     g_ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
     if(!g_ctx){ fprintf(stderr,"secp256k1 init fail\n"); return 1; }
-    if(!load_opencl()) return 1;
 
     cl_platform_id plat; cl_device_id dev; cl_context ctx; cl_command_queue q;
     cl_program prog; cl_kernel k; cl_int ret;
