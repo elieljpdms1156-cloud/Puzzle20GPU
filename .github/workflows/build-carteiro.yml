@@ -25,7 +25,7 @@ jobs:
           python-version: '3.11'
       - name: Instalar PyInstaller
         run: pip install pyinstaller
-      - name: Gerar executável final (GUI + binários)
+      - name: Gerar executável final
         run: |
           pyinstaller --onefile --windowed --add-binary "puzzle_gpu.exe;." --add-binary "kernel.cl;." --name CarteiroGPU app.py
       - name: Upload do artefato

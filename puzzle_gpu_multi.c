@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <time.h>
 #include <CL/cl.h>
-
 #define SECP256K1_STATIC
 #include <secp256k1.h>
 #include "ripemd160.h"
@@ -17,7 +16,6 @@ typedef uint64_t u64;
 static uint8_t targets[MAX_TARGETS][20];
 static int num_targets = 0;
 static uint32_t target_first4[MAX_TARGETS];
-
 static secp256k1_context *g_ctx;
 
 static void make_privkey(uint8_t priv[32], u64 hi, u64 lo) {
@@ -59,7 +57,6 @@ int main(int argc, char* argv[]) {
         printf("Uso: %s <inicio_hex> <fim_hex> <threads>\n", argv[0]);
         return 1;
     }
-    
     u64 lo = strtoull(argv[1], NULL, 16);
     u64 hi = strtoull(argv[2], NULL, 16);
     int nth = atoi(argv[3]);
@@ -89,7 +86,6 @@ int main(int argc, char* argv[]) {
     g_ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
     if(!g_ctx){ fprintf(stderr,"secp256k1 init fail\n"); return 1; }
 
-    // Carrega kernel
     size_t kernel_len = 0;
     char* kernelSrc = read_file("kernel.cl", &kernel_len);
     if (!kernelSrc) { fprintf(stderr, "kernel.cl nao encontrado\n"); return 1; }
