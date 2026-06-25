@@ -1,0 +1,35 @@
+name: Build CarteiroGPU (GUI + GPU)
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Instalar dependências C
+        run: |
+          vcpkg install secp256k1 opencl
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
+      - name: Compilar solver GPU
+        run: |
+          cl /O2 /nologo /MT /Fe:puzzle_gpu.exe puzzle_gpu_multi.c ripemd160.c `
+            /I"$env:VCPKG_ROOT\installed\x64-windows\include" `
+            /link `
+            "$env:VCPKG_ROOT\installed\x64-windows\lib\libsecp256k1.lib" `
+            "$env:VCPKG_ROOT\installed\x64-windows\lib\OpenCL.lib" `
+            user32.lib
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar PyInstaller
+        run: pip install pyinstaller
+      - name: Gerar executável final (GUI + binários)
+        run: |
+          pyinstaller --onefile --windowed --add-binary "puzzle_gpu.exe;." --add-binary "kernel.cl;." --name CarteiroGPU app.py
+      - name: Upload do artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarteiroGPU
+          path: dist/CarteiroGPU.exe
