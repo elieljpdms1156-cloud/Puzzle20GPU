@@ -1,2 +1,2 @@
-// Coloque aqui sua implementação completa de RIPEMD160.
-// (Por brevidade, o script não a inclui – copie do seu código funcional.)
+// COLE AQUI DENTRO A SUA IMPLEMENTAÇÃO COMPLETA DO RIPEMD160
+// (a mesma que você usou no solver CPU e que funcionou)
